@@ -1,0 +1,58 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+*.iml
+*.ipr
+*.iws
+.idea/
+*.log
+
+# Generated files
+*.g.dart
+*.freezed.dart
+
+# Env & secrets — NEVER commit real secrets
+.env
+google-services.json
+GoogleService-Info.plist
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+
+# Android
+android/local.properties
+android/.gradle/
+android/captures/
+android/gradlew
+android/gradlew.bat
+android/gradle/
+**/android/**/GeneratedPluginRegistrant.java
+
+# iOS
+ios/.symlinks/
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/ephemeral/
+ios/Pods/
+ios/Runner.xcworkspace/
+
+# macOS
+macos/Flutter/ephemeral/
+
+# Web
+lib/generated_plugin_registrant.dart
+
+# Coverage
+coverage/
+
+# Keystore (never commit)
+*.jks
+*.keystore
+key.properties
