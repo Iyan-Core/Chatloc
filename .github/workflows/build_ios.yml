@@ -1,0 +1,158 @@
+name: 🍎 Build & Deploy iOS
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      flavor:
+        description: 'Build flavor'
+        required: true
+        default: 'production'
+        type: choice
+        options: [development, staging, production]
+
+env:
+  FLUTTER_VERSION: '3.19.0'
+
+jobs:
+  build_ios:
+    name: 🍎 Build iOS (${{ github.event.inputs.flavor || 'production' }})
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      # ── Import signing certificate ──
+      - name: Import certificate
+        env:
+          P12_BASE64: ${{ secrets.IOS_CERTIFICATE_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          echo -n "$P12_BASE64" | base64 --decode -o "$CERTIFICATE_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$P12_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+
+      # ── Install provisioning profile ──
+      - name: Install provisioning profile
+        run: |
+          PP_PATH=$RUNNER_TEMP/profile.mobileprovision
+          echo -n "${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}" \
+            | base64 --decode -o "$PP_PATH"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp "$PP_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      # ── Inject GoogleService-Info.plist ──
+      - name: Inject GoogleService-Info.plist
+        run: |
+          echo '${{ secrets.GOOGLE_SERVICE_INFO_PLIST }}' \
+            | base64 --decode > ios/Runner/GoogleService-Info.plist
+
+      # ── Create .env ──
+      - name: Create .env
+        run: |
+          cat > .env << EOF
+          FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }}
+          FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_APP_ID_IOS=${{ secrets.FIREBASE_APP_ID_IOS }}
+          FIREBASE_IOS_CLIENT_ID=${{ secrets.FIREBASE_IOS_CLIENT_ID }}
+          FIREBASE_IOS_BUNDLE_ID=${{ secrets.FIREBASE_IOS_BUNDLE_ID }}
+          GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
+          EOF
+
+      # ── Compute version ──
+      - name: Set version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION_NAME="${{ github.ref_name }}"
+            VERSION_NAME="${VERSION_NAME#v}"
+          else
+            VERSION_NAME="1.0.0"
+          fi
+          BUILD_NUMBER=${{ github.run_number }}
+          echo "VERSION_NAME=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
+      # ── Install CocoaPods ──
+      - name: Install pods
+        run: |
+          cd ios
+          pod install --repo-update
+
+      # ── Build IPA ──
+      - name: Build IPA
+        run: |
+          flutter build ipa \
+            --release \
+            --export-options-plist=ios/ExportOptions.plist \
+            --build-name=${{ steps.version.outputs.VERSION_NAME }} \
+            --build-number=${{ steps.version.outputs.BUILD_NUMBER }} \
+            --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }} \
+            --dart-define=FIREBASE_PROJECT_ID=${{ secrets.FIREBASE_PROJECT_ID }} \
+            --dart-define=FIREBASE_STORAGE_BUCKET=${{ secrets.FIREBASE_STORAGE_BUCKET }} \
+            --dart-define=FIREBASE_MESSAGING_SENDER_ID=${{ secrets.FIREBASE_MESSAGING_SENDER_ID }} \
+            --dart-define=FIREBASE_APP_ID_IOS=${{ secrets.FIREBASE_APP_ID_IOS }} \
+            --dart-define=FIREBASE_IOS_CLIENT_ID=${{ secrets.FIREBASE_IOS_CLIENT_ID }} \
+            --dart-define=FIREBASE_IOS_BUNDLE_ID=${{ secrets.FIREBASE_IOS_BUNDLE_ID }} \
+            --dart-define=GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-${{ steps.version.outputs.VERSION_NAME }}
+          path: build/ios/ipa/*.ipa
+          retention-days: 30
+
+      # ── Deploy to TestFlight ──
+      - name: Upload to TestFlight
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: apple-actions/upload-testflight-build@v1
+        with:
+          app-path: build/ios/ipa/*.ipa
+          issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
+          api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
+          api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+
+      # ── Firebase App Distribution (non-tag) ──
+      - name: Deploy to Firebase App Distribution
+        if: "!startsWith(github.ref, 'refs/tags/')"
+        uses: wzieba/Firebase-Distribution-Github-Action@v1
+        with:
+          appId: ${{ secrets.FIREBASE_APP_ID_IOS }}
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          groups: testers
+          file: build/ios/ipa/*.ipa
+
+      # ── Cleanup ──
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f .env
+          rm -f ios/Runner/GoogleService-Info.plist
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db 2>/dev/null || true
