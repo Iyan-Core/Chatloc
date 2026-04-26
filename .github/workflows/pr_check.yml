@@ -1,0 +1,56 @@
+name: ✅ PR Quality Check
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop]
+
+env:
+  FLUTTER_VERSION: '3.19.0'
+
+jobs:
+  quality:
+    name: ✅ Lint · Analyze · Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib/ test/
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Generate mocks / code
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
+      - name: Run tests
+        run: flutter test --coverage --reporter=github
+
+      - name: Check pubspec.lock committed
+        run: |
+          if [ ! -f pubspec.lock ]; then
+            echo "pubspec.lock not committed — please commit it."
+            exit 1
+          fi
+
+      # Dart code metrics (optional, remove if not used)
+      - name: Dart code metrics
+        run: |
+          dart pub global activate dart_code_metrics
+          dart pub global run dart_code_metrics:metrics analyze lib \
+            --reporter=github \
+            --cyclomatic-complexity=20 \
+            --maximum-nesting-level=5 || true
