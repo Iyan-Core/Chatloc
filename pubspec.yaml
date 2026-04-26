@@ -1,0 +1,110 @@
+name: chatloc
+description: ChatLoc - Real-time chat with location sharing
+version: 1.0.0+1
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # Firebase
+  firebase_core: ^2.24.2
+  firebase_auth: ^4.15.3
+  cloud_firestore: ^4.13.6
+  firebase_storage: ^11.5.6
+  firebase_messaging: ^14.7.10
+
+  # State Management
+  flutter_riverpod: ^2.4.10
+  riverpod_annotation: ^2.3.5
+
+  # Navigation
+  go_router: ^13.0.1
+
+  # Location & Maps
+  geolocator: ^11.0.0
+  google_maps_flutter: ^2.5.3
+  geocoding: ^3.0.0
+
+  # UI Components
+  flutter_chat_ui: ^1.6.10
+  flutter_chat_types: ^3.6.2
+  cached_network_image: ^3.3.1
+  image_picker: ^1.0.7
+  flutter_svg: ^2.0.9
+  lottie: ^3.0.0
+  shimmer: ^3.0.0
+  flutter_animate: ^4.3.0
+
+  # Utils
+  uuid: ^4.2.2
+  intl: ^0.18.1
+  permission_handler: ^11.2.0
+  share_plus: ^7.2.2
+  url_launcher: ^6.2.4
+  connectivity_plus: ^5.0.2
+  hive_flutter: ^1.1.0
+  hive: ^2.2.3
+  path_provider: ^2.1.2
+  dio: ^5.4.0
+  pretty_dio_logger: ^1.3.1
+  flutter_dotenv: ^5.1.0
+  package_info_plus: ^5.0.1
+  device_info_plus: ^9.1.1
+  encrypt: ^5.0.3
+
+  # Icons
+  iconsax: ^0.0.8
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+  build_runner: ^2.4.8
+  riverpod_generator: ^2.3.11
+  hive_generator: ^2.0.1
+  json_serializable: ^6.7.1
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.3.10
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - .env
+
+  fonts:
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+        - asset: assets/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#0F172A"
+  adaptive_icon_foreground: "assets/icons/app_icon_foreground.png"
+
+flutter_native_splash:
+  color: "#0F172A"
+  color_dark: "#0F172A"
+  image: assets/icons/app_icon.png
+  android_12:
+    color: "#0F172A"
+    icon_background_color: "#0F172A"
